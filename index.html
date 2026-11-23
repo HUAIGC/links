@@ -639,9 +639,15 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   function colorFor(s) {
     return 'hsl(' + brandOf(s).hue + ' 72% 46%)';
   }
-  function faviconOf(u) {
+  function faviconSrcs(u) {
     var p = parseUrl(u);
-    return p ? 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(p.hostname) + '&sz=64' : '';
+    if (!p) return [];
+    var h = p.hostname;
+    return [
+      'https://' + h + '/favicon.ico',
+      'https://icons.duckduckgo.com/ip3/' + h + '.ico',
+      'https://www.google.com/s2/favicons?domain=' + h + '&sz=64'
+    ];
   }
   function splitTags(s) {
     return (s || '').split(/[,，、]/).map(function (t) { return t.trim(); }).filter(Boolean);
@@ -1208,6 +1214,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     var slice = list.slice(0, shown);
     el.grid.innerHTML = slice.map(cardHtml).join('');
     el.grid.style.display = slice.length ? 'grid' : 'none';
+    bindFavicons(el.grid);
     if (list.length > shown) {
       el.more.innerHTML = '<button class="btn ghost more" type="button">加载更多 · 还有 ' + (list.length - shown) + ' 条</button>';
       el.more.querySelector('.more').addEventListener('click', function () {
@@ -1219,11 +1226,31 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     }
   }
 
+  // 图标按站点自身 favicon → DuckDuckGo → Google 的顺序回退，失败就露出字母底
+  function bindFavicons(root) {
+    Array.prototype.forEach.call(root.querySelectorAll('img.fav'), function (img) {
+      function next() {
+        var fb = img.getAttribute('data-fb') || '';
+        if (!fb) { img.style.display = 'none'; return; }
+        var arr = fb.split('|');
+        img.setAttribute('data-fb', arr.slice(1).join('|'));
+        img.src = arr[0];
+      }
+      img.addEventListener('load', function () { img.style.opacity = '1'; });
+      img.addEventListener('error', next);
+      if (img.complete) {
+        if (img.naturalWidth > 0) img.style.opacity = '1';
+        else next();
+      }
+    });
+  }
+
   function cardHtml(l) {
     var host = hostOf(l.url);
     var m = host.match(/[\u4e00-\u9fa5a-zA-Z0-9]/);
     var letter = m ? m[0].toUpperCase() : '#';
-    var fav = faviconOf(l.url);
+    var srcs = faviconSrcs(l.url);
+    var fav = srcs[0] || '';
     var br = brandOf(host);
     return '' +
       '<div class="card' + (br.known ? '' : ' dim') + '" data-id="' + l.id + '" data-url="' + esc(l.url) + '" style="--bh:' + br.hue + '">' +
@@ -1234,7 +1261,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
         '<div class="head">' +
           '<div class="fav-wrap">' +
             '<div class="fav-fallback" style="background:' + colorFor(host) + '">' + esc(letter) + '</div>' +
-            (fav ? '<img class="fav" src="' + esc(fav) + '" alt="" loading="lazy" onload="this.style.opacity=1" onerror="this.style.display=\'none\'">' : '') +
+            (fav ? '<img class="fav" src="' + esc(fav) + '" data-fb="' + esc(srcs.slice(1).join('|')) + '" alt="" loading="lazy">' : '') +
           '</div>' +
           '<div class="t">' +
             '<div class="title">' + esc(l.title || host) + '</div>' +
