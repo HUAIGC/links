@@ -174,6 +174,11 @@ footer{position:relative;z-index:1}
 .chip:hover{border-color:var(--accent);color:var(--text)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);box-shadow:0 8px 18px -12px var(--accent)}
 .chip .n{opacity:.65;margin-left:5px;font-size:11.5px}
+.chip .fold{opacity:.5;margin-left:5px;font-size:11px}
+.chip.folder{border-color:color-mix(in srgb, var(--accent) 28%, var(--line))}
+.chip.back{color:var(--accent);border-style:dashed}
+.more-wrap{display:flex;justify-content:center;padding:16px 0 4px}
+.btn.more{padding:9px 22px;font-size:13px}
 body.is-admin .chip[data-cat]:not([data-cat="全部"]):not([data-cat="__add"]){cursor:grab}
 .chip.lift{
   cursor:grabbing;transform:scale(1.07);
@@ -373,6 +378,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
 <main>
   <nav class="chips" id="chips"></nav>
   <div class="grid" id="grid"></div>
+  <div class="more-wrap" id="more"></div>
   <div id="empty"></div>
 </main>
 
@@ -486,6 +492,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     btnMenu: document.getElementById('btnMenu'),
     chips: document.getElementById('chips'),
     grid: document.getElementById('grid'),
+    more: document.getElementById('more'),
     empty: document.getElementById('empty'),
     footer: document.getElementById('footer'),
     syncChip: document.getElementById('syncChip'),
@@ -757,18 +764,13 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     try {
       if (isAdmin() && outbox.length) await flushOutbox();
       if (isAdmin() && catsOut.length) await flushCats();
-      var res = await fetch(apiBase() + '?space=eq.' + encodeURIComponent(SPACE) +
-        '&select=space,id,url,title,cat,tags,note,ts,deleted', { headers: readHeaders() });
-      if (!res.ok) throw new Error('拉取失败 HTTP ' + res.status);
-      var remote = await res.json();
+      var remote = await fetchAllRows(apiBase() + '?space=eq.' + encodeURIComponent(SPACE) +
+        '&select=space,id,url,title,cat,tags,note,ts,deleted');
       reconcile(remote, isAdmin());
 
-      var cres = await fetch(catsBase() + '?space=eq.' + encodeURIComponent(SPACE) + '&select=name,sort,ts,deleted',
-        { headers: readHeaders() });
-      if (cres.ok) {
-        var remoteCats = await cres.json();
-        reconcileCats(remoteCats, isAdmin());
-      }
+      var remoteCats = await fetchAllRows(catsBase() + '?space=eq.' + encodeURIComponent(SPACE) +
+        '&select=name,sort,ts,deleted');
+      reconcileCats(remoteCats, isAdmin());
 
       if (isAdmin() && outbox.length) await flushOutbox();
       if (isAdmin() && catsOut.length) await flushCats();
@@ -782,6 +784,21 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     } finally {
       syncBusy = false;
     }
+  }
+
+  // PostgREST 默认单次最多返回 1000 行，这里分页把全部数据取回来
+  async function fetchAllRows(url) {
+    var pageSize = 1000, offset = 0, all = [];
+    for (var guard = 0; guard < 60; guard++) {
+      var sep = url.indexOf('?') >= 0 ? '&' : '?';
+      var res = await fetch(url + sep + 'limit=' + pageSize + '&offset=' + offset, { headers: readHeaders() });
+      if (!res.ok) throw new Error('拉取失败 HTTP ' + res.status);
+      var part = await res.json();
+      all = all.concat(part);
+      if (part.length < pageSize) return all;
+      offset += pageSize;
+    }
+    return all;
   }
 
   function reconcile(remote, canWrite) {
@@ -940,18 +957,20 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   }
 
   function renderCatRows() {
-    var list = categories();
+    var tree = catTree();
+    var root = curRoot();
+    var list = childrenOf(tree, root);
+    el.cNew.placeholder = root ? ('在「' + root.split(SEP).join(' › ') + '」下新建子分类') : '新分类名称，如：素材 / 待读';
     if (!list.length) {
-      el.catRows.innerHTML = '<div class="cat-empty">还没有分类，输入名字点「新建」。</div>';
+      el.catRows.innerHTML = '<div class="cat-empty">' + (root ? '这一层还没有子分类，输入名字点「新建」。' : '还没有分类，输入名字点「新建」。') + '</div>';
       return;
     }
     el.catRows.innerHTML = list.map(function (c) {
-      var n = c.count;
-      return '<div class="crow" data-name="' + esc(c.name) + '">' +
-        '<span class="cname">' + esc(c.name) + '</span>' +
-        '<span class="ccount">' + n + ' 条</span>' +
+      return '<div class="crow" data-name="' + esc(c.path) + '">' +
+        '<span class="cname">' + (c.hasKids ? '📁 ' : '') + esc(c.name) + '</span>' +
+        '<span class="ccount">' + c.count + ' 条</span>' +
         '<button class="mini" data-act="rename">改名</button>' +
-        '<button class="mini del" data-act="delcat"' + (n ? ' disabled' : '') + '>删除</button>' +
+        '<button class="mini del" data-act="delcat"' + (c.count || c.hasKids ? ' disabled' : '') + '>删除</button>' +
         '</div>';
     }).join('');
   }
@@ -959,13 +978,15 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   function createCat() {
     var name = el.cNew.value.trim();
     if (!name) { el.cNew.focus(); return; }
-    if (catKnown(name)) { toast('「' + name + '」已经存在'); return; }
-    addCat(name);
+    var root = curRoot();
+    var full = root ? root + SEP + name.replace(/\//g, '／') : name.replace(/\//g, '／');
+    if (catKnown(full)) { toast('「' + full + '」已经存在'); return; }
+    addCat(full);
     el.cNew.value = '';
     render();
     renderCatRows();
     queueSync();
-    toast('已新建分类「' + name + '」');
+    toast('已新建分类「' + full + '」');
   }
 
   function startRename(row) {
@@ -985,12 +1006,16 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   function doRename(oldName, newName) {
     newName = String(newName || '').trim();
     if (!newName || newName === oldName) { renderCatRows(); return; }
-    if (catKnown(newName)) { toast('已经有同名分类了'); renderCatRows(); return; }
+    newName = newName.replace(/\//g, '／');
+    var cut = oldName.lastIndexOf(SEP);
+    var prefix = cut >= 0 ? oldName.slice(0, cut) : '';
+    var full = prefix ? prefix + SEP + newName : newName;
+    if (catKnown(full)) { toast('已经有同名分类了'); renderCatRows(); return; }
     var ts = Date.now(), moved = 0;
     links.forEach(function (l) {
-      var c = (l.cat || '').trim() || '未分类';
-      if (c === oldName) {
-        l.cat = newName;
+      var c = catOf(l);
+      if (c === oldName || c.indexOf(oldName + SEP) === 0) {
+        l.cat = full + c.slice(oldName.length);
         l.ts = ts;
         outbox.push(rowOf(l, false));
         moved++;
@@ -1005,20 +1030,33 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       oldCat.ts = ts;
       pushCat(oldCat);
     }
-    var item = { name: newName, sort: cats.length, ts: ts, deleted: false };
-    cats.push(item);
-    pushCat(item);
+    // 子分类一起改名
+    cats.forEach(function (c) {
+      if (c.deleted || c.name.indexOf(oldName + SEP) !== 0) return;
+      var renamed = full + c.name.slice(oldName.length);
+      var item = { name: renamed, sort: c.sort, ts: ts, deleted: false };
+      cats.push(item);
+      pushCat(item);
+      c.deleted = true;
+      c.ts = ts;
+      pushCat(c);
+    });
+    var item2 = { name: full, sort: oldCat ? oldCat.sort : cats.length, ts: ts, deleted: false };
+    cats.push(item2);
+    pushCat(item2);
     saveData(); saveOutbox(); saveCats();
-    if (activeCat === oldName) activeCat = newName;
+    if (activeCat === oldName) activeCat = full;
     render();
     renderCatRows();
     queueSync();
-    toast('已改为「' + newName + '」，同步 ' + moved + ' 条链接');
+    toast('已改为「' + full + '」，同步 ' + moved + ' 条链接');
   }
 
   function deleteCat(name) {
-    var n = linkCountByCat()[name] || 0;
+    var tree = catTree();
+    var n = catCount(tree, name);
     if (n) { toast('还有 ' + n + ' 条链接在用，先把它们改到别的分类'); return; }
+    if (tree[name] && tree[name].hasKids) { toast('先删掉里面的子分类'); return; }
     if (!confirm('删除空分类「' + name + '」？')) return;
     var c = catKnown(name);
     if (c) {
@@ -1027,7 +1065,10 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       pushCat(c);
       saveCats();
     }
-    if (activeCat === name) activeCat = '全部';
+    if (activeCat === name) {
+      var cut = name.lastIndexOf(SEP);
+      activeCat = cut >= 0 ? name.slice(0, cut) : '全部';
+    }
     render();
     renderCatRows();
     queueSync();
@@ -1040,30 +1081,60 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   }
 
   /* ---------------- 渲染 ---------------- */
-  function categories() {
-    var map = {};
+  var SEP = '/';
+  var PAGE = 120;
+  var shown = PAGE;
+
+  function catOf(l) { return (l.cat || '').trim() || '未分类'; }
+  function curRoot() { return activeCat === '全部' ? '' : activeCat; }
+
+  // 把 "A/B/C" 这样的分类路径展开成文件夹树
+  function catTree() {
+    var nodes = {};
+    function ensure(path) {
+      if (nodes[path]) return nodes[path];
+      var i = path.lastIndexOf(SEP);
+      var name = i >= 0 ? path.slice(i + 1) : path;
+      var parent = i >= 0 ? path.slice(0, i) : '';
+      var n = { path: path, name: name, parent: parent, count: 0, sort: null, hasKids: false };
+      nodes[path] = n;
+      if (parent) ensure(parent).hasKids = true;
+      return n;
+    }
     links.forEach(function (l) {
-      var c = (l.cat || '').trim() || '未分类';
-      map[c] = (map[c] || 0) + 1;
+      var parts = catOf(l).split(SEP);
+      for (var i = 1; i <= parts.length; i++) {
+        ensure(parts.slice(0, i).join(SEP)).count++;
+      }
     });
     cats.forEach(function (c) {
       if (c.deleted) return;
-      if (!(c.name in map)) map[c.name] = 0;
+      var n = ensure(c.name);
+      if (c.sort != null) n.sort = c.sort;
     });
-    var order = {};
-    cats.forEach(function (c) {
-      if (c.deleted) return;
-      order[c.name] = (c.sort == null ? 1e9 : c.sort);
+    return nodes;
+  }
+
+  function childrenOf(tree, path) {
+    var out = [];
+    Object.keys(tree).forEach(function (p) {
+      if (tree[p].parent === path) out.push(tree[p]);
     });
-    return Object.keys(map).map(function (c) {
-      return { name: c, count: map[c] };
-    }).sort(function (a, b) {
-      var oa = order[a.name] == null ? 1e9 : order[a.name];
-      var ob = order[b.name] == null ? 1e9 : order[b.name];
+    return out.sort(function (a, b) {
+      var oa = a.sort == null ? 1e9 : a.sort;
+      var ob = b.sort == null ? 1e9 : b.sort;
       if (oa !== ob) return oa - ob;
       if (b.count !== a.count) return b.count - a.count;
       return a.name.localeCompare(b.name, 'zh');
     });
+  }
+
+  function catCount(tree, path) { return tree[path] ? tree[path].count : 0; }
+
+  // 兼容旧调用：返回扁平的「完整路径」列表
+  function categories() {
+    var tree = catTree();
+    return Object.keys(tree).map(function (p) { return { name: p, count: tree[p].count }; });
   }
 
   function saveCatOrder(list) {
@@ -1085,12 +1156,21 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     saveCats();
   }
 
-  function renderChips() {
-    var list = categories();
-    var html = '<button class="chip' + (activeCat === '全部' ? ' on' : '') + '" data-cat="全部">全部<span class="n">' + links.length + '</span></button>';
-    list.forEach(function (c) {
-      html += '<button class="chip' + (activeCat === c.name ? ' on' : '') + '" data-cat="' + esc(c.name) + '">' +
-        esc(c.name) + '<span class="n">' + c.count + '</span></button>';
+  function renderChips(tree) {
+    var root = curRoot();
+    var html = '';
+    if (root) {
+      var cut = root.lastIndexOf(SEP);
+      var parent = cut >= 0 ? root.slice(0, cut) : '全部';
+      var pname = parent === '全部' ? '全部' : parent.slice(parent.lastIndexOf(SEP) + 1);
+      html += '<button class="chip back" data-cat="' + esc(parent) + '">‹ ' + esc(pname) + '</button>';
+    } else {
+      html += '<button class="chip on" data-cat="全部">全部<span class="n">' + links.length + '</span></button>';
+    }
+    childrenOf(tree, root).forEach(function (c) {
+      html += '<button class="chip' + (c.hasKids ? ' folder' : '') + '" data-cat="' + esc(c.path) + '">' +
+        esc(c.name) + '<span class="n">' + c.count + '</span>' +
+        (c.hasKids ? '<span class="fold">›</span>' : '') + '</button>';
     });
     if (isAdmin()) {
       html += '<button class="chip addcat" data-cat="__add">＋ 分类</button>';
@@ -1102,13 +1182,29 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
 
   function visibleLinks() {
     var kw = q.trim().toLowerCase();
+    var root = curRoot();
     return links.filter(function (l) {
-      var cat = (l.cat || '').trim() || '未分类';
-      if (activeCat !== '全部' && cat !== activeCat) return false;
+      var cat = catOf(l);
+      if (!kw && root && cat !== root && cat.indexOf(root + SEP) !== 0) return false;
       if (!kw) return true;
       var hay = [l.title, l.url, (l.tags || []).join(' '), l.note].join(' ').toLowerCase();
       return hay.indexOf(kw) !== -1;
     }).sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+  }
+
+  function drawGrid(list) {
+    var slice = list.slice(0, shown);
+    el.grid.innerHTML = slice.map(cardHtml).join('');
+    el.grid.style.display = slice.length ? 'grid' : 'none';
+    if (list.length > shown) {
+      el.more.innerHTML = '<button class="btn ghost more" type="button">加载更多 · 还有 ' + (list.length - shown) + ' 条</button>';
+      el.more.querySelector('.more').addEventListener('click', function () {
+        shown += PAGE * 3;
+        drawGrid(visibleLinks());
+      });
+    } else {
+      el.more.innerHTML = '';
+    }
   }
 
   function cardHtml(l) {
@@ -1143,11 +1239,14 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   function render() {
     if (drag) { pendingRender = true; return; }
     var list = visibleLinks();
-    var catListNow = categories();
-    el.stats.textContent = links.length ? links.length + ' 条 · ' + (catListNow.length || 0) + ' 个分类' : '还没有链接';
-    renderChips();
-    el.grid.innerHTML = list.map(cardHtml).join('');
-    el.grid.style.display = list.length ? 'grid' : 'none';
+    var tree = catTree();
+    var kids = childrenOf(tree, curRoot());
+    el.stats.textContent = links.length
+      ? (curRoot() ? catCount(tree, curRoot()) + ' 条 · ' + curRoot().split(SEP).join(' › ') : links.length + ' 条 · ' + kids.length + ' 个分类')
+      : '还没有链接';
+    renderChips(tree);
+    shown = PAGE;
+    drawGrid(list);
 
     if (!list.length) {
       var msg;
