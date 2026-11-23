@@ -63,7 +63,7 @@ button,input,textarea{font:inherit;color:inherit}
 .syncchip{
   display:inline-flex;align-items:center;gap:6px;margin-left:4px;height:26px;
   border:1px solid var(--line);background:var(--panel);border-radius:999px;
-  padding:0 10px;font-size:11.5px;color:var(--muted);cursor:pointer;
+  padding:0 10px;font-size:11.5px;color:var(--muted);cursor:default;
 }
 .syncchip .dot{width:7px;height:7px;border-radius:50%;background:#b9bfcc;flex:0 0 7px}
 .syncchip.ok .dot{background:var(--ok)}
@@ -94,17 +94,8 @@ button,input,textarea{font:inherit;color:inherit}
 .btn.icon{width:38px;padding:0;font-size:16px;letter-spacing:1px}
 .btn.sm{height:32px;font-size:12.5px;padding:0 11px}
 
-/* ---------- 提示条 ---------- */
-.banner{
-  margin:12px 20px 0;padding:11px 14px;border:1px solid var(--line);
-  background:var(--panel);border-radius:12px;font-size:12.5px;color:var(--muted);
-  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-}
-.banner b{color:var(--text);font-weight:600}
-.banner .btn{margin-left:auto}
-
 /* ---------- 分类 ---------- */
-.chips{display:flex;gap:8px;overflow-x:auto;padding:13px 20px 2px;scrollbar-width:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 2px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{
   flex:0 0 auto;border:1px solid var(--line);background:var(--panel);color:var(--muted);
@@ -135,7 +126,8 @@ main{padding:12px 20px 8px}
   object-fit:contain;background:var(--panel-2);border:1px solid var(--line);
   opacity:0;transition:opacity .2s;
 }
-.t{min-width:0;flex:1;padding-right:22px}
+.t{min-width:0;flex:1}
+body.is-admin .t{padding-right:22px}
 .title{
   font-size:14.5px;font-weight:600;line-height:1.35;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
@@ -148,7 +140,8 @@ main{padding:12px 20px 8px}
 }
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
 .tag{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
-.card-tools{position:absolute;top:9px;right:9px;display:flex;gap:4px;opacity:0;transition:.15s}
+.card-tools{position:absolute;top:9px;right:9px;display:none;gap:4px;opacity:0;transition:.15s}
+body.is-admin .card-tools{display:flex}
 .card:hover .card-tools{opacity:1}
 .mini{
   width:26px;height:26px;border-radius:8px;border:1px solid var(--line);
@@ -187,13 +180,13 @@ label input:focus,label textarea:focus{border-color:var(--accent);box-shadow:0 0
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .dlg-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:4px}
 .hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:12px}
-.sec{border-top:1px solid var(--line);margin:14px 0 0;padding-top:14px}
 .sec-title{font-size:12px;color:var(--muted);margin:0 0 8px}
 .copyrow{display:flex;gap:8px;margin-bottom:10px}
 .copyrow input{
   flex:1;min-width:0;padding:9px 11px;border-radius:10px;border:1px solid var(--line);
   background:var(--panel-2);font-size:12px;outline:none;
 }
+.err{color:var(--danger);font-size:12px;margin-top:6px;min-height:16px}
 
 /* ---------- 菜单 ---------- */
 .menu{
@@ -222,13 +215,12 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   .search input{font-size:16px}
   .btn.icon{width:40px;height:40px}
   #btnAdd{padding:0 13px;height:40px;font-weight:600}
-  .banner{margin:10px 14px 0}
-  .chips{padding:11px 14px 2px}
+  .chips{padding:2px 0}
   main{padding:11px 14px 6px}
   .grid{grid-template-columns:1fr;gap:11px}
   .card-tools{opacity:1}
   .mini{width:30px;height:30px;font-size:14px}
-  .t{padding-right:66px}
+  body.is-admin .t{padding-right:66px}
   footer{padding:10px 14px 28px}
   .row{grid-template-columns:1fr}
 }
@@ -248,32 +240,28 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       <h1>贵湖の高效导航</h1>
       <div class="stats" id="stats">0 条链接</div>
     </div>
-    <button class="syncchip" id="syncChip" title="同步设置">
-      <span class="dot"></span><span class="syncText" id="syncText">本地</span>
-    </button>
+    <div class="syncchip" id="syncChip" title="同步状态">
+      <span class="dot"></span><span class="syncText" id="syncText">只读</span>
+    </div>
   </div>
   <div class="actions">
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="search" type="search" placeholder="搜索标题 / 网址 / 标签">
     </div>
+    <button class="btn ghost" id="btnAuth">登录</button>
     <button class="btn ghost icon" id="btnMenu" title="更多" aria-label="更多">⋯</button>
     <button class="btn primary" id="btnAdd">＋ 添加</button>
   </div>
 </header>
 
-<div class="banner" id="banner" style="display:none"></div>
-
-<nav class="chips" id="chips"></nav>
-
 <main>
+  <nav class="chips" id="chips"></nav>
   <div class="grid" id="grid"></div>
   <div id="empty"></div>
 </main>
 
-<footer id="footer">
-  数据保存在当前设备的浏览器里。
-</footer>
+<footer id="footer">数据来自云端，所有人可浏览。</footer>
 
 <!-- 添加 / 编辑 -->
 <dialog id="dlg">
@@ -305,24 +293,22 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   </form>
 </dialog>
 
-<!-- 同步设置 -->
-<dialog id="syncDlg">
-  <form method="dialog">
-    <h2>同步设置</h2>
-    <div id="syncBody"></div>
+<!-- 管理员登录 -->
+<dialog id="authDlg">
+  <form id="authForm" method="dialog">
+    <h2 id="authTitle">管理员登录</h2>
+    <div id="authBody"></div>
     <div class="dlg-foot">
-      <button type="button" class="btn ghost" id="syncClose">关闭</button>
+      <button type="button" class="btn ghost" id="authClose">关闭</button>
     </div>
   </form>
 </dialog>
 
 <div class="menu" id="menu">
-  <button data-act="sync">同步设置</button>
-  <div class="sep"></div>
   <button data-act="export">导出备份（JSON）</button>
-  <button data-act="import">导入备份（JSON）</button>
-  <div class="sep"></div>
-  <button data-act="clear" class="danger">清空全部链接</button>
+  <button data-act="import" data-admin="1">导入备份（JSON）</button>
+  <div class="sep" data-admin="1"></div>
+  <button data-act="clear" class="danger" data-admin="1">清空全部链接</button>
 </div>
 <input type="file" id="file" accept="application/json,.json" hidden>
 
@@ -333,15 +319,16 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
 
   var CFG = window.LINKS_CONFIG || {};
   var KEY = 'links-data-v2';
-  var SPACE_KEY = 'links.space';
   var OUTBOX_KEY = 'links.outbox';
+  var AUTH_KEY = 'links.auth';
   var PALETTE = ['#4f46e5','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
 
+  var SPACE = CFG.defaultSpace || '';
+  var AUTH = loadJson(AUTH_KEY, null);
   var links = loadJson(KEY, []);
   if (!Array.isArray(links)) links = [];
   var outbox = loadJson(OUTBOX_KEY, []);
   if (!Array.isArray(outbox)) outbox = [];
-  var space = resolveSpace();
   var q = '';
   var activeCat = '全部';
   var editingId = null;
@@ -352,17 +339,19 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     stats: document.getElementById('stats'),
     search: document.getElementById('search'),
     btnAdd: document.getElementById('btnAdd'),
+    btnAuth: document.getElementById('btnAuth'),
     btnMenu: document.getElementById('btnMenu'),
     chips: document.getElementById('chips'),
     grid: document.getElementById('grid'),
     empty: document.getElementById('empty'),
-    banner: document.getElementById('banner'),
     footer: document.getElementById('footer'),
     syncChip: document.getElementById('syncChip'),
     syncText: document.getElementById('syncText'),
-    syncDlg: document.getElementById('syncDlg'),
-    syncBody: document.getElementById('syncBody'),
-    syncClose: document.getElementById('syncClose'),
+    authDlg: document.getElementById('authDlg'),
+    authBody: document.getElementById('authBody'),
+    authTitle: document.getElementById('authTitle'),
+    authForm: document.getElementById('authForm'),
+    authClose: document.getElementById('authClose'),
     dlg: document.getElementById('dlg'),
     dlgTitle: document.getElementById('dlgTitle'),
     form: document.getElementById('form'),
@@ -385,11 +374,12 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     } catch (e) { return dflt; }
   }
   function setJson(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); }
-    catch (e) { alert('保存失败：浏览器不允许写入本地存储（可能处于无痕模式）。'); }
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { }
   }
+  function delKey(k) { try { localStorage.removeItem(k); } catch (e) { } }
   function saveData() { setJson(KEY, links); }
   function saveOutbox() { setJson(OUTBOX_KEY, outbox); }
+  function isAdmin() { return !!(AUTH && AUTH.token); }
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -430,65 +420,109 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     return (s || '').split(/[,，、]/).map(function (t) { return t.trim(); }).filter(Boolean);
   }
 
-  /* ---------------- 同步：基础 ---------------- */
-  function cfgReady() { return !!(CFG.supabaseUrl && CFG.supabaseKey); }
-  function apiBase() { return CFG.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/links'; }
-  function sbHeaders() {
-    return {
-      'apikey': CFG.supabaseKey,
-      'Authorization': 'Bearer ' + CFG.supabaseKey,
-      'Content-Type': 'application/json'
-    };
-  }
-  function newSpace() {
-    var a = new Uint8Array(16);
-    (window.crypto || window.msCrypto).getRandomValues(a);
-    return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-  }
-  function resolveSpace() {
-    var m = /(?:^#|&)s=([A-Za-z0-9_-]+)/.exec(location.hash || '');
-    var fromHash = m ? m[1] : null;
-    var stored = null;
-    try { stored = localStorage.getItem(SPACE_KEY); } catch (e) { }
-    if (fromHash) {
-      try { localStorage.setItem(SPACE_KEY, fromHash); } catch (e) { }
-      return fromHash;
-    }
-    return stored || null;
-  }
-  function persistSpace(sp) {
-    space = sp;
-    try { localStorage.setItem(SPACE_KEY, sp); } catch (e) { }
-    try {
-      if (location.protocol !== 'file:') {
-        history.replaceState(null, '', location.pathname + location.search + '#s=' + sp);
-      }
-    } catch (e) { }
-    refreshChrome();
-  }
-  function pairLink() {
-    var base = location.protocol === 'file:'
-      ? location.href.split('#')[0]
-      : location.origin + location.pathname + location.search;
-    return base + '#s=' + space;
+  /* ---------------- 认证 ---------------- */
+  function sbUrl(path) { return CFG.supabaseUrl.replace(/\/+$/, '') + path; }
+  function apiBase() { return sbUrl('/rest/v1/links'); }
+  function readHeaders() {
+    return { 'apikey': CFG.supabaseKey, 'Authorization': 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' };
   }
 
+  function saveAuth(a) {
+    AUTH = a;
+    if (a) setJson(AUTH_KEY, a); else delKey(AUTH_KEY);
+    document.body.classList.toggle('is-admin', !!a);
+    el.btnAuth.textContent = a ? '管理' : '登录';
+    el.btnAdd.style.display = a ? '' : 'none';
+    var items = el.menu.querySelectorAll('[data-admin="1"]');
+    for (var i = 0; i < items.length; i++) items[i].style.display = a ? '' : 'none';
+    refreshFooter();
+  }
+
+  async function refreshTokens() {
+    if (!AUTH || !AUTH.refresh) return null;
+    try {
+      var res = await fetch(sbUrl('/auth/v1/token?grant_type=refresh_token'), {
+        method: 'POST',
+        headers: { 'apikey': CFG.supabaseKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: AUTH.refresh })
+      });
+      if (!res.ok) return null;
+      var d = await res.json();
+      var next = {
+        token: d.access_token,
+        refresh: d.refresh_token || AUTH.refresh,
+        exp: Date.now() / 1000 + (d.expires_in || 3600),
+        email: (d.user && d.user.email) || AUTH.email
+      };
+      saveAuth(next);
+      return next.token;
+    } catch (e) { return null; }
+  }
+
+  async function ensureToken() {
+    if (!isAdmin()) return null;
+    if (AUTH.exp && AUTH.exp - Date.now() / 1000 < 120) {
+      return await refreshTokens();
+    }
+    return AUTH.token;
+  }
+
+  async function login(email, password) {
+    var res = await fetch(sbUrl('/auth/v1/token?grant_type=password'), {
+      method: 'POST',
+      headers: { 'apikey': CFG.supabaseKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password })
+    });
+    var d = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      throw new Error(d.error_description || d.msg || d.message || '登录失败');
+    }
+    saveAuth({
+      token: d.access_token,
+      refresh: d.refresh_token,
+      exp: Date.now() / 1000 + (d.expires_in || 3600),
+      email: (d.user && d.user.email) || email
+    });
+  }
+
+  async function authedFetch(url, opts) {
+    var token = await ensureToken();
+    if (!token) throw new Error('未登录');
+    opts.headers = Object.assign({
+      'apikey': CFG.supabaseKey,
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json'
+    }, opts.headers || {});
+    var res = await fetch(url, opts);
+    if (res.status === 401) {
+      var t2 = await refreshTokens();
+      if (t2) {
+        opts.headers.Authorization = 'Bearer ' + t2;
+        res = await fetch(url, opts);
+      }
+      if (res.status === 401) {
+        saveAuth(null);
+        render(); refreshFooter();
+        toast('登录已过期，请重新登录');
+      }
+    }
+    return res;
+  }
+
+  /* ---------------- 同步 ---------------- */
   function setStatus(s) {
-    var map = { ok: '已同步', syncing: '同步中', offline: '同步失败', idle: '未绑定', na: '本地' };
-    el.syncChip.className = 'syncchip ' + s;
-    el.syncText.textContent = map[s] || '本地';
-    el.syncChip.title = {
-      ok: '已与云端同步，点击查看设置',
-      syncing: '正在与云端同步',
-      offline: '连不上云端，改动已存在本机，稍后自动重试',
-      idle: '这台设备还没绑定同步库，点击绑定',
-      na: '当前是本地模式（未配置云端），点击查看说明'
-    }[s] || '';
+    var map = {
+      ok: ['已同步', 'ok'], syncing: ['同步中', 'syncing'], offline: ['离线', 'offline'],
+      idle: ['只读', 'idle'], na: ['本地', 'idle']
+    };
+    var v = map[s] || map.na;
+    el.syncText.textContent = v[0];
+    el.syncChip.className = 'syncchip ' + v[1];
   }
 
   function rowOf(l, deleted) {
     return {
-      space: space, id: l.id, url: l.url, title: l.title || '',
+      space: SPACE, id: l.id, url: l.url, title: l.title || '',
       cat: l.cat || '', tags: l.tags || [], note: l.note || '',
       ts: l.ts || 0, deleted: !!deleted
     };
@@ -501,33 +535,30 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     };
   }
 
-  /* ---------------- 同步：一次完整往返 ---------------- */
   async function syncNow(manual) {
-    if (!cfgReady()) { setStatus('na'); if (manual) openSync(); return; }
-    if (!space) { setStatus('idle'); if (manual) openSync(); return; }
+    if (!CFG.supabaseUrl || !SPACE) { setStatus('na'); return; }
     if (syncBusy) return;
     syncBusy = true;
     setStatus('syncing');
     try {
-      var res = await fetch(apiBase() + '?space=eq.' + encodeURIComponent(space) +
-        '&select=space,id,url,title,cat,tags,note,ts,deleted', { headers: sbHeaders() });
+      var res = await fetch(apiBase() + '?space=eq.' + encodeURIComponent(SPACE) +
+        '&select=space,id,url,title,cat,tags,note,ts,deleted', { headers: readHeaders() });
       if (!res.ok) throw new Error('拉取失败 HTTP ' + res.status);
       var remote = await res.json();
-      reconcile(remote);
-      await flushOutbox();
+      reconcile(remote, isAdmin());
+      if (isAdmin() && outbox.length) await flushOutbox();
       setStatus('ok');
-      if (manual) toast('同步完成');
+      if (manual) toast(isAdmin() ? '同步完成' : '已是最新');
     } catch (e) {
       console.warn(e);
       setStatus('offline');
-      if (manual) toast('同步失败：' + (e.message || '网络问题'));
+      if (manual) toast('连不上云端：' + (e.message || '网络问题'));
     } finally {
       syncBusy = false;
-      refreshChrome();
     }
   }
 
-  function reconcile(remote) {
+  function reconcile(remote, canWrite) {
     var byId = {};
     remote.forEach(function (r) { byId[r.id] = r; });
     var localIds = {};
@@ -536,10 +567,17 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     var keep = [];
     links.forEach(function (l) {
       var r = byId[l.id];
-      if (r && r.deleted) return;                        // 云端的删除
-      if (!r) { outbox.push(rowOf(l, false)); keep.push(l); return; }  // 云端还没有 → 上传
-      if ((r.ts || 0) >= (l.ts || 0)) { keep.push(fromRow(r)); }        // 云端更新 → 覆盖本机
-      else { keep.push(l); outbox.push(rowOf(l, false)); }              // 本机更新 → 上传
+      if (r && r.deleted) return;
+      if (!r) {
+        if (canWrite) outbox.push(rowOf(l, false));
+        keep.push(l);
+        return;
+      }
+      if ((r.ts || 0) >= (l.ts || 0)) { keep.push(fromRow(r)); }
+      else {
+        keep.push(l);
+        if (canWrite) outbox.push(rowOf(l, false));
+      }
     });
 
     remote.forEach(function (r) {
@@ -547,38 +585,36 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       keep.push(fromRow(r));
     });
 
-    dedupeByUrl(keep);
+    dedupeByUrl(keep, canWrite);
     links = keep;
     saveData();
     saveOutbox();
     render();
   }
 
-  // 同一网址只留最新一条，其余标记为云端删除
-  function dedupeByUrl(list) {
+  function dedupeByUrl(list, canWrite) {
     var map = {}, keep = [];
     list.forEach(function (l) {
       var cur = map[l.url];
       if (!cur) { map[l.url] = l; keep.push(l); return; }
       if ((l.ts || 0) > (cur.ts || 0)) {
         map[l.url] = l;
-        outbox.push(rowOf(cur, true));
+        if (canWrite) outbox.push(rowOf(cur, true));
         var i = keep.indexOf(cur);
         if (i >= 0) keep.splice(i, 1);
         keep.push(l);
-      } else {
+      } else if (canWrite) {
         outbox.push(rowOf(l, true));
       }
     });
-    return keep;
   }
 
   async function flushOutbox() {
     if (!outbox.length) return;
     var payload = outbox.slice();
-    var res = await fetch(apiBase() + '?on_conflict=space,id', {
+    var res = await authedFetch(apiBase() + '?on_conflict=space,id', {
       method: 'POST',
-      headers: Object.assign({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }, sbHeaders()),
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error('上传失败 HTTP ' + res.status);
@@ -587,9 +623,9 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   }
 
   function queueSync() {
-    if (!cfgReady() || !space) { refreshChrome(); return; }
+    if (!SPACE) return;
     if (syncTimer) clearTimeout(syncTimer);
-    syncTimer = setTimeout(function () { syncTimer = null; syncNow(false); }, 600);
+    syncTimer = setTimeout(function () { syncTimer = null; syncNow(false); }, 500);
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -656,53 +692,30 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   function render() {
     var list = visibleLinks();
     var cats = categories();
-
-    el.stats.textContent = links.length
-      ? links.length + ' 条 · ' + (cats.length || 0) + ' 个分类'
-      : '还没有链接';
-
+    el.stats.textContent = links.length ? links.length + ' 条 · ' + (cats.length || 0) + ' 个分类' : '还没有链接';
     renderChips();
     el.grid.innerHTML = list.map(cardHtml).join('');
     el.grid.style.display = list.length ? 'grid' : 'none';
 
     if (!list.length) {
-      if (!links.length) {
-        el.empty.innerHTML = '<div class="empty"><div class="big">🔗</div>' +
-          '<p>导航库还是空的</p>' +
-          '<p>点右上角「＋ 添加」开始收藏。</p>' +
-          '<button class="btn ghost" id="btnDemo">先载入几条示例看看</button></div>';
-        var demo = document.getElementById('btnDemo');
-        if (demo) demo.addEventListener('click', seedDemo);
-      } else {
-        el.empty.innerHTML = '<div class="empty"><div class="big">🔍</div>' +
-          '<p>没有匹配的链接</p><p>换个关键词，或点「全部」回到完整列表。</p></div>';
-      }
+      el.empty.innerHTML = links.length
+        ? '<div class="empty"><div class="big">🔍</div><p>没有匹配的链接</p><p>换个关键词，或点「全部」回到完整列表。</p></div>'
+        : '<div class="empty"><div class="big">🔗</div><p>导航库还是空的</p>' +
+          (isAdmin() ? '<p>点右上角「＋ 添加」开始收藏。</p>' : '<p>管理员还没有添加内容。</p>') + '</div>';
     } else {
       el.empty.innerHTML = '';
     }
   }
 
-  function refreshChrome() {
-    var syncOn = cfgReady() && !!space;
-    el.footer.innerHTML = syncOn
-      ? '已接入云端同步：改动会自动上传，换设备打开同一个配对链接即可看到同一份链接。'
-      : '数据保存在当前设备的浏览器里，不会上传。';
-
-    if (cfgReady() && !space) {
-      el.banner.style.display = 'flex';
-      el.banner.innerHTML = '<span>这台设备还没绑定同步库，先绑定才能看到云端的链接。</span>' +
-        '<button class="btn ghost sm" id="bannerBtn">绑定 / 新建</button>';
-      document.getElementById('bannerBtn').onclick = openSync;
-    } else {
-      el.banner.style.display = 'none';
-    }
-
-    if (!cfgReady()) setStatus('na');
-    else if (!space) setStatus('idle');
+  function refreshFooter() {
+    el.footer.textContent = isAdmin()
+      ? '你已登录为管理员，可以添加、修改、删除链接，改动会同步到云端。'
+      : '数据来自云端，任何人可浏览，只有管理员登录后才能添加或修改。';
   }
 
   /* ---------------- 增删改 ---------------- */
   function openDialog(id) {
+    if (!isAdmin()) { openAuth(); return; }
     editingId = id || null;
     var l = null;
     if (id) {
@@ -720,6 +733,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   }
 
   function submitForm() {
+    if (!isAdmin()) return;
     var url = normalizeUrl(el.fUrl.value);
     if (!url) { el.fUrl.focus(); return; }
     var title = el.fTitle.value.trim() || titleFromUrl(url);
@@ -732,25 +746,32 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       links.forEach(function (l) {
         if (l.id === editingId) {
           l.url = url; l.title = title; l.cat = cat; l.tags = tags; l.note = note; l.ts = ts;
-          pushRow(l);
+          outbox.push(rowOf(l, false));
         }
       });
     } else {
       var item = { id: uid(), url: url, title: title, cat: cat, tags: tags, note: note, ts: ts };
       links.push(item);
-      pushRow(item);
+      outbox.push(rowOf(item, false));
     }
-    saveData();
+    saveData(); saveOutbox();
     if (!editingId) activeCat = '全部';
     render();
     el.dlg.close();
     queueSync();
   }
 
-  function pushRow(l, deleted) {
-    if (!cfgReady() || !space) return;
-    outbox.push(rowOf(l, deleted));
-    saveOutbox();
+  function removeLink(id) {
+    if (!isAdmin()) return;
+    var target = null;
+    links.forEach(function (l) { if (l.id === id) target = l; });
+    if (!target) return;
+    if (!confirm('删除「' + (target.title || hostOf(target.url)) + '」？')) return;
+    outbox.push(rowOf(target, true));
+    links = links.filter(function (l) { return l.id !== id; });
+    saveData(); saveOutbox();
+    render();
+    queueSync();
   }
 
   /* ---------------- 交互 ---------------- */
@@ -772,7 +793,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     if (!card) return;
     var act = e.target.closest('[data-act]');
     var id = card.getAttribute('data-id');
-    if (act) {
+    if (act && isAdmin()) {
       e.stopPropagation();
       var a = act.getAttribute('data-act');
       if (a === 'edit') { openDialog(id); return; }
@@ -781,18 +802,6 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     }
     window.open(card.getAttribute('data-url'), '_blank', 'noopener');
   });
-
-  function removeLink(id) {
-    var target = null;
-    links.forEach(function (l) { if (l.id === id) target = l; });
-    if (!target) return;
-    if (!confirm('删除「' + (target.title || hostOf(target.url)) + '」？')) return;
-    pushRow(target, true);
-    links = links.filter(function (l) { return l.id !== id; });
-    saveData();
-    render();
-    queueSync();
-  }
 
   el.form.addEventListener('submit', function (e) { e.preventDefault(); submitForm(); });
   el.form.addEventListener('keydown', function (e) {
@@ -828,97 +837,88 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     if (!b) return;
     var a = b.getAttribute('data-act');
     el.menu.classList.remove('show');
-    if (a === 'sync') openSync();
-    else if (a === 'export') exportJson();
-    else if (a === 'import') el.file.click();
+    if (a === 'export') exportJson();
+    else if (a === 'import') { if (isAdmin()) el.file.click(); }
     else if (a === 'clear') {
-      if (!links.length) return;
+      if (!isAdmin() || !links.length) return;
       if (!confirm('清空全部 ' + links.length + ' 条链接？不可恢复，建议先导出备份。')) return;
-      links.forEach(function (l) { pushRow(l, true); });
+      links.forEach(function (l) { outbox.push(rowOf(l, true)); });
       links = [];
-      saveData();
+      saveData(); saveOutbox();
       activeCat = '全部'; q = ''; el.search.value = '';
       render();
       queueSync();
     }
   });
 
-  /* ---------------- 同步设置弹窗 ---------------- */
-  function openSync() {
-    var html = '';
-    if (!cfgReady()) {
-      html += '<div class="hint" style="margin-top:0">还没有配置云端服务，所以现在只能本地保存。' +
-        '把 <b>config.js</b> 里的 <b>supabaseUrl</b> 和 <b>supabaseKey</b> 填上，或让 AI 帮你配置，就是跨设备同步了。</div>';
-    } else if (!space) {
-      html += '<div class="sec-title">这台设备还没有绑定同步库</div>' +
-        '<div class="copyrow"><input id="inSpace" placeholder="粘贴另一台设备的同步码"><button class="btn ghost sm" type="button" id="btnBind">绑定</button></div>' +
-        '<div class="hint" style="margin-top:0">或者新建一个同步库：本机的 ' + links.length + ' 条链接会一起上传。</div>' +
+  /* ---------------- 登录弹窗 ---------------- */
+  function openAuth() {
+    if (isAdmin()) {
+      el.authTitle.textContent = '管理员';
+      el.authBody.innerHTML =
+        '<div class="sec-title">当前登录</div>' +
+        '<div class="copyrow"><input value="' + esc(AUTH.email || '') + '" readonly></div>' +
+        '<div class="hint" style="margin-top:0">你可以添加、修改、删除链接，改动会同步给所有人。</div>' +
         '<div class="dlg-foot" style="justify-content:flex-start;margin-top:10px">' +
-        '<button class="btn primary sm" type="button" id="btnNewSpace">新建同步库</button></div>';
-    } else {
-      html += '<div class="sec-title">配对链接（在其他设备打开它，就会连到同一份数据）</div>' +
-        '<div class="copyrow"><input id="inPair" readonly value="' + esc(pairLink()) + '">' +
-        '<button class="btn ghost sm" type="button" id="btnCopyPair">复制</button></div>' +
-        '<div class="sec-title">同步码</div>' +
-        '<div class="copyrow"><input id="inSpaceCode" readonly value="' + esc(space) + '">' +
-        '<button class="btn ghost sm" type="button" id="btnCopyCode">复制</button></div>' +
-        '<div class="dlg-foot" style="justify-content:space-between;margin-top:6px">' +
-        '<button class="btn ghost sm" type="button" id="btnSyncNow">立即同步</button>' +
-        '<button class="btn ghost sm" type="button" id="btnUnbind">解除绑定</button></div>' +
-        '<div class="hint">链接数据存在你自己的 Supabase 数据库里，前缀随机生成，别人猜不到。别把配对链接发给外人。</div>';
+        '<button type="button" class="btn ghost sm" id="btnLogout">退出登录</button>' +
+        '<button type="button" class="btn ghost sm" id="btnSyncNow">立即同步</button></div>';
+      el.authDlg.showModal();
+      bindClick('btnLogout', function () {
+        saveAuth(null); render(); el.authDlg.close(); toast('已退出登录');
+      });
+      bindClick('btnSyncNow', function () { el.authDlg.close(); syncNow(true); });
+      return;
     }
-    el.syncBody.innerHTML = html;
-    el.syncDlg.showModal();
 
-    bind('btnBind', function () {
-      var v = (document.getElementById('inSpace') || {}).value || '';
-      v = v.trim();
-      if (!v) return;
-      var m = /s=([A-Za-z0-9_-]+)/.exec(v);
-      persistSpace(m ? m[1] : v);
-      el.syncDlg.close();
-      render(); refreshChrome(); syncNow(true);
-    });
-    bind('btnNewSpace', function () {
-      persistSpace(newSpace());
-      el.syncDlg.close();
-      render(); refreshChrome(); syncNow(true);
-    });
-    bind('btnCopyPair', function () { copyText(document.getElementById('inPair')); });
-    bind('btnCopyCode', function () { copyText(document.getElementById('inSpaceCode')); });
-    bind('btnSyncNow', function () { el.syncDlg.close(); syncNow(true); });
-    bind('btnUnbind', function () {
-      if (!confirm('解除后这台设备不再同步，本地链接仍会保留。')) return;
-      try { localStorage.removeItem(SPACE_KEY); } catch (e) { }
-      space = null;
-      el.syncDlg.close();
-      refreshChrome();
+    el.authTitle.textContent = '管理员登录';
+    el.authBody.innerHTML =
+      '<label>邮箱<input id="aEmail" type="email" autocomplete="username" placeholder="管理员邮箱"></label>' +
+      '<label>密码<input id="aPwd" type="password" autocomplete="current-password" placeholder="密码"></label>' +
+      '<div class="err" id="aErr"></div>' +
+      '<div class="dlg-foot" style="justify-content:flex-start;margin-top:4px">' +
+      '<button type="button" class="btn primary sm" id="btnLogin">登录</button></div>' +
+      '<div class="hint">只有管理员能添加和修改，访客打开就是只读浏览。</div>';
+    el.authDlg.showModal();
+    bindClick('btnLogin', doLogin);
+    var pw = document.getElementById('aPwd');
+    pw.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
     });
   }
 
-  function bind(id, fn) {
+  async function doLogin() {
+    var email = (document.getElementById('aEmail') || {}).value || '';
+    var pwd = (document.getElementById('aPwd') || {}).value || '';
+    var errBox = document.getElementById('aErr');
+    email = email.trim();
+    if (!email || !pwd) { if (errBox) errBox.textContent = '请填写邮箱和密码'; return; }
+    var btn = document.getElementById('btnLogin');
+    if (btn) { btn.disabled = true; btn.textContent = '登录中…'; }
+    try {
+      await login(email, pwd);
+      el.authDlg.close();
+      render(); refreshFooter();
+      toast('登录成功，现在可以编辑了');
+      syncNow(true);
+    } catch (e) {
+      if (errBox) errBox.textContent = e.message || '登录失败';
+      if (btn) { btn.disabled = false; btn.textContent = '登录'; }
+    }
+  }
+
+  function bindClick(id, fn) {
     var n = document.getElementById(id);
     if (n) n.addEventListener('click', fn);
   }
 
-  function copyText(input) {
-    if (!input) return;
-    var v = input.value;
-    var done = function () { toast('已复制'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(v).then(done, function () { input.select(); document.execCommand('copy'); done(); });
-    } else {
-      input.select();
-      try { document.execCommand('copy'); done(); } catch (e) { alert('请手动复制：' + v); }
-    }
-  }
-
-  el.syncChip.addEventListener('click', function () { openSync(); });
-  el.syncClose.addEventListener('click', function () { el.syncDlg.close(); });
+  el.btnAuth.addEventListener('click', openAuth);
+  el.authClose.addEventListener('click', function () { el.authDlg.close(); });
+  el.authDlg.addEventListener('click', function (e) { if (e.target === el.authDlg) el.authDlg.close(); });
+  el.syncChip.addEventListener('click', function () { syncNow(true); });
 
   /* ---------------- 备份 ---------------- */
   function exportJson() {
-    var payload = { app: 'links-site', version: 2, exportedAt: new Date().toISOString(), links: links };
+    var payload = { app: 'links-site', version: 3, exportedAt: new Date().toISOString(), links: links };
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -931,6 +931,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   }
 
   el.file.addEventListener('change', function () {
+    if (!isAdmin()) return;
     var f = this.files && this.files[0];
     if (!f) return;
     var reader = new FileReader();
@@ -954,62 +955,43 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
           ts: Date.now()
         };
         links.push(item);
-        pushRow(item);
+        outbox.push(rowOf(item, false));
         added++;
       });
-      saveData(); render(); queueSync();
+      saveData(); saveOutbox();
+      render(); queueSync();
       alert('导入完成，新增 ' + added + ' 条（重复网址已跳过）。');
     };
     reader.readAsText(f);
     this.value = '';
   });
 
-  function seedDemo() {
-    var now = Date.now();
-    [
-      { url: 'https://www.notion.so', title: 'Notion', cat: '工具', tags: ['笔记'], note: '写文档、做项目管理。' },
-      { url: 'https://github.com', title: 'GitHub', cat: '工具', tags: ['代码'], note: '仓库、Issues、Actions。' },
-      { url: 'https://www.bilibili.com', title: '哔哩哔哩', cat: '娱乐', tags: ['视频'], note: '教程和纪录片都在这儿看。' },
-      { url: 'https://developer.mozilla.org/zh-CN/', title: 'MDN 文档', cat: '学习', tags: ['前端', '文档'], note: '查 API 首选。' }
-    ].forEach(function (d, i) {
-      var item = { id: uid(), url: d.url, title: d.title, cat: d.cat, tags: d.tags, note: d.note, ts: now - i * 1000 };
-      links.push(item);
-      pushRow(item);
-    });
-    saveData(); render(); queueSync();
-  }
-
   function toast(msg) {
     var t = document.createElement('div');
     t.textContent = msg;
     t.style.cssText = 'position:fixed;left:50%;bottom:34px;transform:translateX(-50%);' +
       'background:rgba(24,28,37,.92);color:#fff;font-size:12.5px;padding:9px 16px;border-radius:10px;' +
-      'z-index:60;pointer-events:none;opacity:0;transition:opacity .2s';
+      'z-index:60;pointer-events:none;opacity:0;transition:opacity .2s;max-width:80vw;text-align:center';
     document.body.appendChild(t);
     requestAnimationFrame(function () { t.style.opacity = '1'; });
     setTimeout(function () {
       t.style.opacity = '0';
       setTimeout(function () { t.remove(); }, 240);
-    }, 1800);
+    }, 1900);
   }
 
   /* ---------------- 启动 ---------------- */
+  saveAuth(AUTH);
   render();
-  refreshChrome();
-  if (cfgReady() && space) syncNow(false);
+  refreshFooter();
+  if (CFG.supabaseUrl && SPACE) syncNow(false);
 
-  window.addEventListener('focus', function () {
-    if (cfgReady() && space) syncNow(false);
-  });
-  window.addEventListener('online', function () {
-    if (cfgReady() && space) syncNow(false);
-  });
+  window.addEventListener('focus', function () { if (CFG.supabaseUrl && SPACE) syncNow(false); });
+  window.addEventListener('online', function () { if (CFG.supabaseUrl && SPACE) syncNow(false); });
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && cfgReady() && space) syncNow(false);
+    if (!document.hidden && CFG.supabaseUrl && SPACE) syncNow(false);
   });
-  setInterval(function () {
-    if (cfgReady() && space && !syncBusy) syncNow(false);
-  }, 30000);
+  setInterval(function () { if (CFG.supabaseUrl && SPACE && !syncBusy) syncNow(false); }, 45000);
 })();
 </script>
 </body>
