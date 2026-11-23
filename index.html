@@ -270,6 +270,29 @@ label input:focus,label textarea:focus{border-color:var(--accent);box-shadow:0 0
 }
 .err{color:var(--danger);font-size:12px;margin-top:6px;min-height:16px}
 
+/* ---------- 分类管理 ---------- */
+.cat-new{display:flex;gap:8px;margin-bottom:14px}
+.cat-new input{
+  flex:1;min-width:0;padding:9px 11px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel-2);font-size:16px;outline:none;
+}
+@media (min-width:520px){ .cat-new input{font-size:13.5px} }
+.cat-new input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.cat-list{max-height:46vh;overflow:auto;margin:0 -4px}
+.crow{
+  display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--line);
+}
+.crow:last-child{border-bottom:0}
+.crow .cname{font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crow .ccount{font-size:11.5px;color:var(--muted);flex:0 0 auto}
+.crow .mini{flex:0 0 auto;width:auto;padding:0 9px;height:26px;border-radius:8px;font-size:12px}
+.crow input.rename{
+  flex:1;min-width:0;padding:5px 8px;border-radius:8px;border:1px solid var(--accent);
+  background:var(--panel-2);font-size:13px;outline:none;
+}
+.crow.dim .cname{color:var(--muted)}
+.cat-empty{font-size:12.5px;color:var(--muted);padding:10px 4px}
+
 /* ---------- 菜单 ---------- */
 .menu{
   position:fixed;z-index:40;min-width:200px;padding:6px;
@@ -387,11 +410,28 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   </form>
 </dialog>
 
+<!-- 分类管理 -->
+<dialog id="catDlg">
+  <form id="catForm" method="dialog">
+    <h2>分类管理</h2>
+    <div class="cat-new">
+      <input id="cNew" placeholder="新分类名称，如：素材 / 待读" autocomplete="off">
+      <button type="button" class="btn primary sm" id="cAdd">新建</button>
+    </div>
+    <div class="cat-list" id="catRows"></div>
+    <div class="hint">只有空分类能删除；改名会把该分类下的链接一起改过去。</div>
+    <div class="dlg-foot">
+      <button type="button" class="btn ghost" id="catClose">关闭</button>
+    </div>
+  </form>
+</dialog>
+
 <div class="menu" id="menu">
   <button data-act="theme" id="menuTheme">切换到深色</button>
   <div class="sep" data-admin="1"></div>
   <button data-act="export" data-admin="1">导出备份（JSON）</button>
   <button data-act="import" data-admin="1">导入备份（JSON）</button>
+  <button data-act="cats" data-admin="1">分类管理</button>
   <div class="sep" data-admin="1"></div>
   <button data-act="clear" class="danger" data-admin="1">清空全部链接</button>
 </div>
@@ -405,6 +445,8 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   var CFG = window.LINKS_CONFIG || {};
   var KEY = 'links-data-v2';
   var OUTBOX_KEY = 'links.outbox';
+  var CATS_KEY = 'links-cats-v1';
+  var CATS_OUT = 'links.catsoutbox';
   var AUTH_KEY = 'links.auth';
 
   var SPACE = CFG.defaultSpace || '';
@@ -413,6 +455,10 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   if (!Array.isArray(links)) links = [];
   var outbox = loadJson(OUTBOX_KEY, []);
   if (!Array.isArray(outbox)) outbox = [];
+  var cats = loadJson(CATS_KEY, []);
+  if (!Array.isArray(cats)) cats = [];
+  var catsOut = loadJson(CATS_OUT, []);
+  if (!Array.isArray(catsOut)) catsOut = [];
   var q = '';
   var activeCat = '全部';
   var editingId = null;
@@ -447,7 +493,13 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     catList: document.getElementById('catList'),
     btnCancel: document.getElementById('btnCancel'),
     menu: document.getElementById('menu'),
-    file: document.getElementById('file')
+    file: document.getElementById('file'),
+    catDlg: document.getElementById('catDlg'),
+    catForm: document.getElementById('catForm'),
+    catRows: document.getElementById('catRows'),
+    cNew: document.getElementById('cNew'),
+    cAdd: document.getElementById('cAdd'),
+    catClose: document.getElementById('catClose')
   };
 
   /* ---------------- 存储 ---------------- */
@@ -463,7 +515,46 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   function delKey(k) { try { localStorage.removeItem(k); } catch (e) { } }
   function saveData() { setJson(KEY, links); }
   function saveOutbox() { setJson(OUTBOX_KEY, outbox); }
+  function saveCats() { setJson(CATS_KEY, cats); }
+  function saveCatsOut() { setJson(CATS_OUT, catsOut); }
   function isAdmin() { return !!(AUTH && AUTH.token); }
+
+  function catKnown(name) {
+    for (var i = 0; i < cats.length; i++) {
+      if (cats[i].name === name && !cats[i].deleted) return cats[i];
+    }
+    return null;
+  }
+  function pushCat(c) {
+    catsOut.push({ space: SPACE, name: c.name, sort: c.sort || 0, ts: c.ts || Date.now(), deleted: !!c.deleted });
+    saveCatsOut();
+  }
+  function inCatsOut(name) {
+    for (var i = 0; i < catsOut.length; i++) if (catsOut[i].name === name) return true;
+    return false;
+  }
+  function addCat(name) {
+    name = String(name || '').trim();
+    if (!name) return false;
+    var c = catKnown(name);
+    if (c) return false;
+    var dead = null;
+    for (var i = 0; i < cats.length; i++) {
+      if (cats[i].name === name) dead = cats[i];
+    }
+    if (dead) {
+      dead.deleted = false;
+      dead.ts = Date.now();
+      pushCat(dead);
+      saveCats();
+      return true;
+    }
+    var item = { name: name, sort: cats.length, ts: Date.now(), deleted: false };
+    cats.push(item);
+    pushCat(item);
+    saveCats();
+    return true;
+  }
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -532,6 +623,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   /* ---------------- 认证 ---------------- */
   function sbUrl(path) { return CFG.supabaseUrl.replace(/\/+$/, '') + path; }
   function apiBase() { return sbUrl('/rest/v1/links'); }
+  function catsBase() { return sbUrl('/rest/v1/cats'); }
   function readHeaders() {
     return { 'apikey': CFG.supabaseKey, 'Authorization': 'Bearer ' + CFG.supabaseKey, 'Content-Type': 'application/json' };
   }
@@ -655,7 +747,16 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       if (!res.ok) throw new Error('拉取失败 HTTP ' + res.status);
       var remote = await res.json();
       reconcile(remote, isAdmin());
+
+      var cres = await fetch(catsBase() + '?space=eq.' + encodeURIComponent(SPACE) + '&select=name,sort,ts,deleted',
+        { headers: readHeaders() });
+      if (cres.ok) {
+        var remoteCats = await cres.json();
+        reconcileCats(remoteCats, isAdmin());
+      }
+
       if (isAdmin() && outbox.length) await flushOutbox();
+      if (isAdmin() && catsOut.length) await flushCats();
       setStatus('ok');
       if (manual) toast(isAdmin() ? '同步完成' : '已是最新');
     } catch (e) {
@@ -743,6 +844,171 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     return false;
   }
 
+  function reconcileCats(remote, canWrite) {
+    var byName = {};
+    remote.forEach(function (r) { byName[r.name] = r; });
+    var keep = [], seen = {};
+    cats.forEach(function (c) {
+      var r = byName[c.name];
+      if (r && r.deleted) return;
+      if (!r) {
+        if (canWrite && !inCatsOut(c.name)) {
+          catsOut.push({ space: SPACE, name: c.name, sort: c.sort || 0, ts: c.ts || 0, deleted: false });
+        }
+        keep.push(c);
+        seen[c.name] = true;
+        return;
+      }
+      if ((r.ts || 0) >= (c.ts || 0)) {
+        keep.push({ name: r.name, sort: r.sort || 0, ts: r.ts || 0, deleted: false });
+      } else {
+        keep.push(c);
+        if (canWrite && !inCatsOut(c.name)) {
+          catsOut.push({ space: SPACE, name: c.name, sort: c.sort || 0, ts: c.ts || 0, deleted: false });
+        }
+      }
+      seen[c.name] = true;
+    });
+    remote.forEach(function (r) {
+      if (r.deleted || seen[r.name]) return;
+      keep.push({ name: r.name, sort: r.sort || 0, ts: r.ts || 0, deleted: false });
+    });
+    cats = keep;
+    saveCats();
+    saveCatsOut();
+  }
+
+  async function flushCats() {
+    if (!catsOut.length) return;
+    var map = {}, order = [];
+    catsOut.forEach(function (r) {
+      if (!map[r.name]) order.push(r.name);
+      map[r.name] = r;
+    });
+    catsOut = order.map(function (n) { return map[n]; });
+    saveCatsOut();
+    var res = await authedFetch(catsBase() + '?on_conflict=space,name', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(catsOut)
+    });
+    if (!res.ok) throw new Error('分类上传失败 HTTP ' + res.status);
+    catsOut = [];
+    saveCatsOut();
+  }
+
+  function linkCountByCat() {
+    var counts = {};
+    links.forEach(function (l) {
+      var c = (l.cat || '').trim() || '未分类';
+      counts[c] = (counts[c] || 0) + 1;
+    });
+    return counts;
+  }
+
+  /* ---------------- 分类管理 ---------------- */
+  function openCats() {
+    if (!isAdmin()) return;
+    renderCatRows();
+    el.cNew.value = '';
+    el.catDlg.showModal();
+    setTimeout(function () { el.cNew.focus(); }, 40);
+  }
+
+  function renderCatRows() {
+    var list = categories();
+    if (!list.length) {
+      el.catRows.innerHTML = '<div class="cat-empty">还没有分类，输入名字点「新建」。</div>';
+      return;
+    }
+    el.catRows.innerHTML = list.map(function (c) {
+      var n = c.count;
+      return '<div class="crow" data-name="' + esc(c.name) + '">' +
+        '<span class="cname">' + esc(c.name) + '</span>' +
+        '<span class="ccount">' + n + ' 条</span>' +
+        '<button class="mini" data-act="rename">改名</button>' +
+        '<button class="mini del" data-act="delcat"' + (n ? ' disabled' : '') + '>删除</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  function createCat() {
+    var name = el.cNew.value.trim();
+    if (!name) { el.cNew.focus(); return; }
+    if (catKnown(name)) { toast('「' + name + '」已经存在'); return; }
+    addCat(name);
+    el.cNew.value = '';
+    render();
+    renderCatRows();
+    queueSync();
+    toast('已新建分类「' + name + '」');
+  }
+
+  function startRename(row) {
+    var old = row.getAttribute('data-name');
+    row.innerHTML = '<input class="rename" value="' + esc(old) + '">' +
+      '<button class="mini" data-act="saverename">保存</button>' +
+      '<button class="mini" data-act="cancelrename">取消</button>';
+    var inp = row.querySelector('input');
+    inp.focus();
+    inp.select();
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); doRename(old, inp.value); }
+      if (e.key === 'Escape') { e.preventDefault(); renderCatRows(); }
+    });
+  }
+
+  function doRename(oldName, newName) {
+    newName = String(newName || '').trim();
+    if (!newName || newName === oldName) { renderCatRows(); return; }
+    if (catKnown(newName)) { toast('已经有同名分类了'); renderCatRows(); return; }
+    var ts = Date.now(), moved = 0;
+    links.forEach(function (l) {
+      var c = (l.cat || '').trim() || '未分类';
+      if (c === oldName) {
+        l.cat = newName;
+        l.ts = ts;
+        outbox.push(rowOf(l, false));
+        moved++;
+      }
+    });
+    var oldCat = null;
+    for (var i = 0; i < cats.length; i++) {
+      if (cats[i].name === oldName && !cats[i].deleted) oldCat = cats[i];
+    }
+    if (oldCat) {
+      oldCat.deleted = true;
+      oldCat.ts = ts;
+      pushCat(oldCat);
+    }
+    var item = { name: newName, sort: cats.length, ts: ts, deleted: false };
+    cats.push(item);
+    pushCat(item);
+    saveData(); saveOutbox(); saveCats();
+    if (activeCat === oldName) activeCat = newName;
+    render();
+    renderCatRows();
+    queueSync();
+    toast('已改为「' + newName + '」，同步 ' + moved + ' 条链接');
+  }
+
+  function deleteCat(name) {
+    var n = linkCountByCat()[name] || 0;
+    if (n) { toast('还有 ' + n + ' 条链接在用，先把它们改到别的分类'); return; }
+    if (!confirm('删除空分类「' + name + '」？')) return;
+    var c = catKnown(name);
+    if (c) {
+      c.deleted = true;
+      c.ts = Date.now();
+      pushCat(c);
+      saveCats();
+    }
+    if (activeCat === name) activeCat = '全部';
+    render();
+    renderCatRows();
+    queueSync();
+  }
+
   function queueSync() {
     if (!SPACE) return;
     if (syncTimer) clearTimeout(syncTimer);
@@ -756,19 +1022,30 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       var c = (l.cat || '').trim() || '未分类';
       map[c] = (map[c] || 0) + 1;
     });
-    return Object.keys(map).sort(function (a, b) { return map[b] - map[a]; })
-      .map(function (c) { return { name: c, count: map[c] }; });
+    cats.forEach(function (c) {
+      if (c.deleted) return;
+      if (!(c.name in map)) map[c.name] = 0;
+    });
+    return Object.keys(map).map(function (c) {
+      return { name: c, count: map[c] };
+    }).sort(function (a, b) {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name, 'zh');
+    });
   }
 
   function renderChips() {
-    var cats = categories();
+    var list = categories();
     var html = '<button class="chip' + (activeCat === '全部' ? ' on' : '') + '" data-cat="全部">全部<span class="n">' + links.length + '</span></button>';
-    cats.forEach(function (c) {
+    list.forEach(function (c) {
       html += '<button class="chip' + (activeCat === c.name ? ' on' : '') + '" data-cat="' + esc(c.name) + '">' +
         esc(c.name) + '<span class="n">' + c.count + '</span></button>';
     });
-    el.chips.innerHTML = links.length ? html : '';
-    el.chips.style.display = links.length ? 'flex' : 'none';
+    if (isAdmin()) {
+      html += '<button class="chip addcat" data-cat="__add">＋ 分类</button>';
+    }
+    el.chips.innerHTML = html;
+    el.chips.style.display = 'flex';
   }
 
   function visibleLinks() {
@@ -820,10 +1097,17 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     el.grid.style.display = list.length ? 'grid' : 'none';
 
     if (!list.length) {
-      el.empty.innerHTML = links.length
-        ? '<div class="empty"><div class="big">🔍</div><p>没有匹配的链接</p><p>换个关键词，或点「全部」回到完整列表。</p></div>'
-        : '<div class="empty"><div class="big">🔗</div><p>导航库还是空的</p>' +
+      var msg;
+      if (!links.length) {
+        msg = '<div class="empty"><div class="big">🔗</div><p>导航库还是空的</p>' +
           (isAdmin() ? '<p>点右上角「＋ 添加」开始收藏。</p>' : '<p>管理员还没有添加内容。</p>') + '</div>';
+      } else if (!q.trim() && activeCat !== '全部' && activeCat !== '未分类') {
+        msg = '<div class="empty"><div class="big">🗂</div><p>「' + esc(activeCat) + '」里还没有链接</p>' +
+          (isAdmin() ? '<p>点「＋ 添加」，把分类填成「' + esc(activeCat) + '」即可。</p>' : '<p>等管理员添加。</p>') + '</div>';
+      } else {
+        msg = '<div class="empty"><div class="big">🔍</div><p>没有匹配的链接</p><p>换个关键词，或点「全部」回到完整列表。</p></div>';
+      }
+      el.empty.innerHTML = msg;
     } else {
       el.empty.innerHTML = '';
     }
@@ -877,6 +1161,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       outbox.push(rowOf(item, false));
     }
     saveData(); saveOutbox();
+    if (cat) addCat(cat);
     if (!editingId) activeCat = '全部';
     render();
     el.dlg.close();
@@ -906,8 +1191,38 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   el.chips.addEventListener('click', function (e) {
     var b = e.target.closest('.chip');
     if (!b) return;
-    activeCat = b.getAttribute('data-cat');
+    var cat = b.getAttribute('data-cat');
+    if (cat === '__add') { openCats(); return; }
+    activeCat = cat;
     render();
+  });
+
+  /* 分类管理弹窗 */
+  el.cAdd.addEventListener('click', function (e) { e.preventDefault(); createCat(); });
+  el.cNew.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); createCat(); }
+  });
+  el.catClose.addEventListener('click', function () { el.catDlg.close(); });
+  el.catDlg.addEventListener('click', function (e) { if (e.target === el.catDlg) el.catDlg.close(); });
+  el.catRows.addEventListener('click', function (e) {
+    var row = e.target.closest('.crow');
+    if (!row) return;
+    var act = e.target.closest('[data-act]');
+    var name = row.getAttribute('data-name');
+    if (act) {
+      var a = act.getAttribute('data-act');
+      if (a === 'rename') { startRename(row); return; }
+      if (a === 'delcat') { deleteCat(name); return; }
+      if (a === 'saverename') {
+        var inp = row.querySelector('input');
+        doRename(name, inp ? inp.value : '');
+        return;
+      }
+      if (a === 'cancelrename') { renderCatRows(); return; }
+    } else {
+      if (row.querySelector('input.rename')) return;
+      startRename(row);
+    }
   });
 
   el.grid.addEventListener('click', function (e) {
@@ -961,6 +1276,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     el.menu.classList.remove('show');
     if (a === 'export') { if (isAdmin()) exportJson(); }
     else if (a === 'theme') toggleTheme();
+    else if (a === 'cats') openCats();
     else if (a === 'import') { if (isAdmin()) el.file.click(); }
     else if (a === 'clear') {
       if (!isAdmin() || !links.length) return;
