@@ -166,6 +166,13 @@ footer{position:relative;z-index:1}
 
 /* ---------- 分类 ---------- */
 .chips{display:flex;flex-wrap:wrap;gap:8px;overflow:visible;padding:2px 0 4px}
+.chips.vertical{flex-direction:column;flex-wrap:nowrap;gap:5px;max-width:680px}
+.chips.vertical .chip{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  border-radius:10px;padding:9px 13px;font-size:13px;
+}
+.chips.vertical .chip .n{margin-left:auto;font-size:12px}
+.chips.vertical .chip .fold{margin-left:6px}
 .chips::-webkit-scrollbar{display:none}
 .chip{
   flex:0 0 auto;border:1px solid var(--line);background:var(--panel);color:var(--muted);
@@ -1178,6 +1185,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     }
     el.chips.innerHTML = html;
     el.chips.classList.remove('dragging');
+    el.chips.classList.toggle('vertical', !!root);
     el.chips.style.display = 'flex';
   }
 
