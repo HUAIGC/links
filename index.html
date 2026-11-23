@@ -1175,7 +1175,8 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     } else {
       html += '<button class="chip on" data-cat="全部">全部<span class="n">' + links.length + '</span></button>';
     }
-    childrenOf(tree, root).forEach(function (c) {
+    var kids = childrenOf(tree, root);
+    kids.forEach(function (c) {
       html += '<button class="chip' + (c.hasKids ? ' folder' : '') + '" data-cat="' + esc(c.path) + '">' +
         esc(c.name) + '<span class="n">' + c.count + '</span>' +
         (c.hasKids ? '<span class="fold">›</span>' : '') + '</button>';
@@ -1185,7 +1186,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     }
     el.chips.innerHTML = html;
     el.chips.classList.remove('dragging');
-    el.chips.classList.toggle('vertical', !!root);
+    el.chips.classList.toggle('vertical', !!root && kids.length > 0);
     el.chips.style.display = 'flex';
   }
 
