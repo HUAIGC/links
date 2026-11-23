@@ -1084,6 +1084,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   var SEP = '/';
   var PAGE = 120;
   var shown = PAGE;
+  var lastViewKey = '';
 
   function catOf(l) { return (l.cat || '').trim() || '未分类'; }
   function curRoot() { return activeCat === '全部' ? '' : activeCat; }
@@ -1245,7 +1246,8 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       ? (curRoot() ? catCount(tree, curRoot()) + ' 条 · ' + curRoot().split(SEP).join(' › ') : links.length + ' 条 · ' + kids.length + ' 个分类')
       : '还没有链接';
     renderChips(tree);
-    shown = PAGE;
+    var viewKey = activeCat + '|' + q;
+    if (viewKey !== lastViewKey) { lastViewKey = viewKey; shown = PAGE; }
     drawGrid(list);
 
     if (!list.length) {
@@ -1692,7 +1694,10 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && CFG.supabaseUrl && SPACE) syncNow(false);
   });
-  setInterval(function () { if (CFG.supabaseUrl && SPACE && !syncBusy) syncNow(false); }, 45000);
+  setInterval(function () {
+    if (!CFG.supabaseUrl || !SPACE || syncBusy || document.hidden) return;
+    syncNow(false);
+  }, 180000);
 })();
 </script>
 </body>
