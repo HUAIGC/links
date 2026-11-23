@@ -770,6 +770,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
 
       if (isAdmin() && outbox.length) await flushOutbox();
       if (isAdmin() && catsOut.length) await flushCats();
+      render();
       setStatus('ok');
       if (manual) toast(isAdmin() ? '同步完成' : '已是最新');
     } catch (e) {
