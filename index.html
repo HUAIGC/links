@@ -569,14 +569,14 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       var r = byId[l.id];
       if (r && r.deleted) return;
       if (!r) {
-        if (canWrite) outbox.push(rowOf(l, false));
+        if (canWrite && !inOutbox(l.id)) outbox.push(rowOf(l, false));
         keep.push(l);
         return;
       }
       if ((r.ts || 0) >= (l.ts || 0)) { keep.push(fromRow(r)); }
       else {
         keep.push(l);
-        if (canWrite) outbox.push(rowOf(l, false));
+        if (canWrite && !inOutbox(l.id)) outbox.push(rowOf(l, false));
       }
     });
 
@@ -611,15 +611,27 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
 
   async function flushOutbox() {
     if (!outbox.length) return;
-    var payload = outbox.slice();
+    // 同一批次里同一个 id 只能出现一次，否则 PostgREST 会报 21000
+    var map = {}, order = [];
+    outbox.forEach(function (r) {
+      if (!map[r.id]) order.push(r.id);
+      map[r.id] = r;
+    });
+    outbox = order.map(function (id) { return map[id]; });
+    saveOutbox();
     var res = await authedFetch(apiBase() + '?on_conflict=space,id', {
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(outbox)
     });
     if (!res.ok) throw new Error('上传失败 HTTP ' + res.status);
     outbox = [];
     saveOutbox();
+  }
+
+  function inOutbox(id) {
+    for (var i = 0; i < outbox.length; i++) if (outbox[i].id === id) return true;
+    return false;
   }
 
   function queueSync() {
