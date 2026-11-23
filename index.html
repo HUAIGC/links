@@ -198,6 +198,39 @@ body.is-admin .chip[data-cat]:not([data-cat="全部"]):not([data-cat="__add"]){c
 
 /* ---------- 列表 ---------- */
 main{padding:12px 20px 8px}
+.tree{display:none}
+.crumb{display:none;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);padding:2px 0 8px}
+.crumb.on{display:flex}
+.crumb button{
+  border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;
+  padding:3px 4px;border-radius:7px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.crumb button:hover{color:var(--accent);background:var(--panel-2)}
+.crumb button.cur{color:var(--text);font-weight:600;cursor:default}
+.crumb .sep2{opacity:.45}
+.catpath{font-size:11px;color:var(--muted);margin-top:8px;padding-top:7px;border-top:1px solid var(--line);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.catpath.golink{cursor:pointer}
+.catpath.golink:hover{color:var(--accent)}
+@media (min-width:1080px){
+  main{display:grid;grid-template-columns:250px minmax(0,1fr);gap:22px;align-items:start}
+  .tree{display:block}
+  #chips{display:none !important}
+  .content{min-width:0}
+}
+.tree{position:sticky;top:8px;max-height:calc(100vh - 96px);overflow:auto;
+  border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:8px;scrollbar-width:thin}
+.trow{
+  display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;
+  font-size:12.5px;color:var(--muted);
+}
+.trow:hover{background:var(--panel-2);color:var(--text)}
+.trow.on{background:var(--accent-soft);color:var(--text);font-weight:600}
+.trow .caret{width:14px;flex:0 0 14px;text-align:center;opacity:.55;transition:transform .12s}
+.trow .caret.open{transform:rotate(90deg);color:var(--accent);opacity:1}
+.trow .caret.blank{opacity:0;cursor:default}
+.trow .tname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .tcount{flex:0 0 auto;font-size:11px;opacity:.6}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(266px,1fr));gap:13px}
 .card{
   --bh:240;
@@ -383,10 +416,14 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
 </header>
 
 <main>
-  <nav class="chips" id="chips"></nav>
-  <div class="grid" id="grid"></div>
-  <div class="more-wrap" id="more"></div>
-  <div id="empty"></div>
+  <aside class="tree" id="tree"></aside>
+  <div class="content">
+    <nav class="crumb" id="crumb"></nav>
+    <nav class="chips" id="chips"></nav>
+    <div class="grid" id="grid"></div>
+    <div class="more-wrap" id="more"></div>
+    <div id="empty"></div>
+  </div>
 </main>
 
 <footer id="footer">数据来自云端，所有人可浏览。</footer>
@@ -498,6 +535,8 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     btnAuth: document.getElementById('btnAuth'),
     btnMenu: document.getElementById('btnMenu'),
     chips: document.getElementById('chips'),
+    tree: document.getElementById('tree'),
+    crumb: document.getElementById('crumb'),
     grid: document.getElementById('grid'),
     more: document.getElementById('more'),
     empty: document.getElementById('empty'),
@@ -1151,6 +1190,50 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     return Object.keys(tree).map(function (p) { return { name: p, count: tree[p].count }; });
   }
 
+  /* ---------------- 层级导航 / 深链 ---------------- */
+  var EXPAND_KEY = 'links.expanded';
+  var expanded = loadJson(EXPAND_KEY, {});
+  if (!expanded || typeof expanded !== 'object') expanded = {};
+  function saveExpanded() { setJson(EXPAND_KEY, expanded); }
+
+  function readHashCat() {
+    try {
+      var h = location.hash || '';
+      if (h.indexOf('#/') !== 0) return '';
+      var p = decodeURI(h.slice(2));
+      return p.trim() || '';
+    } catch (e) { return ''; }
+  }
+
+  function syncHash() {
+    var p = curRoot();
+    var next = p ? '#/' + encodeURI(p) : '';
+    try {
+      if (next) {
+        if (location.hash !== next) history.replaceState(null, '', location.pathname + location.search + next);
+      } else if (location.hash) {
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    } catch (e) { }
+  }
+
+  function expandAncestors(path) {
+    if (!path) return;
+    var parts = path.split(SEP), cur = '';
+    for (var i = 0; i < parts.length; i++) {
+      cur = cur ? cur + SEP + parts[i] : parts[i];
+      expanded[cur] = true;
+    }
+    saveExpanded();
+  }
+
+  function go(path) {
+    activeCat = path || '全部';
+    if (activeCat !== '全部') expandAncestors(activeCat);
+    render();
+    syncHash();
+  }
+
   function saveCatOrder(list) {
     var ts = Date.now();
     list.forEach(function (name, i) {
@@ -1194,6 +1277,43 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     el.chips.classList.remove('dragging');
     el.chips.classList.toggle('vertical', !!root);
     el.chips.style.display = 'flex';
+  }
+
+  function renderCrumb() {
+    var root = curRoot();
+    if (!root) { el.crumb.innerHTML = ''; el.crumb.classList.remove('on'); return; }
+    var parts = root.split(SEP), cur = '', html = '';
+    html += '<button data-cat="全部">全部</button>';
+    for (var i = 0; i < parts.length; i++) {
+      cur = cur ? cur + SEP + parts[i] : parts[i];
+      html += '<span class="sep2">›</span>';
+      html += i === parts.length - 1
+        ? '<button class="cur" title="' + esc(cur) + '">' + esc(parts[i]) + '</button>'
+        : '<button data-cat="' + esc(cur) + '" title="' + esc(cur) + '">' + esc(parts[i]) + '</button>';
+    }
+    el.crumb.innerHTML = html;
+    el.crumb.classList.add('on');
+  }
+
+  function renderTree(tree) {
+    if (!el.tree) return;
+    function walk(parent, depth) {
+      var kids = childrenOf(tree, parent), out = '';
+      kids.forEach(function (n) {
+        var open = !!expanded[n.path];
+        out += '<div class="trow' + (activeCat === n.path ? ' on' : '') + '" data-cat="' + esc(n.path) + '" style="padding-left:' + (8 + depth * 13) + 'px">' +
+          '<span class="caret' + (n.hasKids ? (open ? ' open' : '') : ' blank') + '" data-toggle="' + esc(n.path) + '">' +
+          (n.hasKids ? '▸' : '·') + '</span>' +
+          '<span class="tname" title="' + esc(n.name) + '">' + esc(n.name) + '</span>' +
+          '<span class="tcount">' + n.count + '</span></div>';
+        if (n.hasKids && open) out += walk(n.path, depth + 1);
+      });
+      return out;
+    }
+    el.tree.innerHTML =
+      '<div class="trow root' + (activeCat === '全部' ? ' on' : '') + '" data-cat="全部" style="padding-left:8px">' +
+      '<span class="caret blank">·</span><span class="tname">全部</span><span class="tcount">' + links.length + '</span></div>' +
+      walk('', 0);
   }
 
   function visibleLinks() {
@@ -1272,7 +1392,18 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
         ((l.tags && l.tags.length)
           ? '<div class="tags">' + l.tags.map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') + '</div>'
           : '') +
+        (pathLine(l)) +
       '</div>';
+  }
+
+  // 卡片底部显示所属目录；管理员可点击跳过去
+  function pathLine(l) {
+    var cat = catOf(l);
+    if (cat.indexOf(SEP) < 0) return '';
+    var label = cat.split(SEP).join(' › ');
+    return isAdmin()
+      ? '<div class="catpath golink" data-act="goto" data-cat="' + esc(cat) + '" title="' + esc(cat) + '">' + esc(label) + '</div>'
+      : '<div class="catpath" title="' + esc(cat) + '">' + esc(label) + '</div>';
   }
 
   function render() {
@@ -1286,6 +1417,8 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
         : links.length + ' 条 · ' + kids.length + ' 个分类')
       : '还没有链接';
     renderChips(tree);
+    renderCrumb();
+    renderTree(tree);
     var viewKey = activeCat + '|' + q;
     if (viewKey !== lastViewKey) { lastViewKey = viewKey; shown = PAGE; }
     drawGrid(list);
@@ -1391,7 +1524,39 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     if (!b) return;
     var cat = b.getAttribute('data-cat');
     if (cat === '__add') { openCats(); return; }
-    activeCat = cat;
+    go(cat);
+  });
+
+  /* 面包屑 */
+  el.crumb.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-cat]');
+    if (!b) return;
+    go(b.getAttribute('data-cat'));
+  });
+
+  /* 左侧目录树 */
+  if (el.tree) {
+    el.tree.addEventListener('click', function (e) {
+      var caret = e.target.closest('[data-toggle]');
+      if (caret) {
+        var p = caret.getAttribute('data-toggle');
+        if (expanded[p]) delete expanded[p]; else expanded[p] = true;
+        saveExpanded();
+        renderTree(catTree());
+        e.stopPropagation();
+        return;
+      }
+      var row = e.target.closest('.trow');
+      if (!row) return;
+      go(row.getAttribute('data-cat'));
+    });
+  }
+
+  window.addEventListener('hashchange', function () {
+    var p = readHashCat() || '全部';
+    if (p === activeCat) return;
+    activeCat = p;
+    if (activeCat !== '全部') expandAncestors(activeCat);
     render();
   });
 
@@ -1507,6 +1672,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       var a = act.getAttribute('data-act');
       if (a === 'edit') { openDialog(id); return; }
       if (a === 'del') { removeLink(id); return; }
+      if (a === 'goto') { var gc = act.getAttribute('data-cat'); if (gc) go(gc); return; }
       return;
     }
     window.open(card.getAttribute('data-url'), '_blank', 'noopener');
@@ -1728,6 +1894,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     } catch (e) { }
   }
   saveAuth(AUTH);
+  activeCat = readHashCat() || '全部';
   render();
   refreshFooter();
   if (CFG.supabaseUrl && SPACE) syncNow(false);
