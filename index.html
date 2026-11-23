@@ -174,6 +174,15 @@ footer{position:relative;z-index:1}
 .chip:hover{border-color:var(--accent);color:var(--text)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);box-shadow:0 8px 18px -12px var(--accent)}
 .chip .n{opacity:.65;margin-left:5px;font-size:11.5px}
+body.is-admin .chip[data-cat]:not([data-cat="全部"]):not([data-cat="__add"]){cursor:grab}
+.chip.lift{
+  cursor:grabbing;transform:scale(1.07);
+  border-color:var(--accent);
+  box-shadow:0 10px 22px -12px rgba(0,0,0,.5), 0 0 0 2px var(--accent-soft);
+  background:var(--panel);color:var(--text);
+  transition:none;z-index:5;position:relative;
+}
+.chips.dragging{touch-action:none;user-select:none;-webkit-user-select:none}
 
 /* ---------- 列表 ---------- */
 main{padding:12px 20px 8px}
@@ -464,6 +473,10 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   var editingId = null;
   var syncBusy = false;
   var syncTimer = null;
+  var holdTimer = null;
+  var drag = null;
+  var lastDragEnd = 0;
+  var pendingRender = false;
 
   var el = {
     stats: document.getElementById('stats'),
@@ -1026,12 +1039,39 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       if (c.deleted) return;
       if (!(c.name in map)) map[c.name] = 0;
     });
+    var order = {};
+    cats.forEach(function (c) {
+      if (c.deleted) return;
+      order[c.name] = (c.sort == null ? 1e9 : c.sort);
+    });
     return Object.keys(map).map(function (c) {
       return { name: c, count: map[c] };
     }).sort(function (a, b) {
+      var oa = order[a.name] == null ? 1e9 : order[a.name];
+      var ob = order[b.name] == null ? 1e9 : order[b.name];
+      if (oa !== ob) return oa - ob;
       if (b.count !== a.count) return b.count - a.count;
       return a.name.localeCompare(b.name, 'zh');
     });
+  }
+
+  function saveCatOrder(list) {
+    var ts = Date.now();
+    list.forEach(function (name, i) {
+      var c = catKnown(name);
+      if (!c) {
+        var item = { name: name, sort: i, ts: ts, deleted: false };
+        cats.push(item);
+        pushCat(item);
+        return;
+      }
+      if (c.sort !== i) {
+        c.sort = i;
+        c.ts = ts;
+        pushCat(c);
+      }
+    });
+    saveCats();
   }
 
   function renderChips() {
@@ -1045,6 +1085,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
       html += '<button class="chip addcat" data-cat="__add">＋ 分类</button>';
     }
     el.chips.innerHTML = html;
+    el.chips.classList.remove('dragging');
     el.chips.style.display = 'flex';
   }
 
@@ -1089,9 +1130,10 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   }
 
   function render() {
+    if (drag) { pendingRender = true; return; }
     var list = visibleLinks();
-    var cats = categories();
-    el.stats.textContent = links.length ? links.length + ' 条 · ' + (cats.length || 0) + ' 个分类' : '还没有链接';
+    var catListNow = categories();
+    el.stats.textContent = links.length ? links.length + ' 条 · ' + (catListNow.length || 0) + ' 个分类' : '还没有链接';
     renderChips();
     el.grid.innerHTML = list.map(cardHtml).join('');
     el.grid.style.display = list.length ? 'grid' : 'none';
@@ -1189,6 +1231,7 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
   el.btnAdd.addEventListener('click', function () { openDialog(null); });
 
   el.chips.addEventListener('click', function (e) {
+    if (Date.now() - lastDragEnd < 350) return;
     var b = e.target.closest('.chip');
     if (!b) return;
     var cat = b.getAttribute('data-cat');
@@ -1196,6 +1239,80 @@ footer{padding:12px 20px 34px;font-size:11.5px;color:var(--muted);line-height:1.
     activeCat = cat;
     render();
   });
+
+  /* 长按分类拖动排序 */
+  el.chips.addEventListener('pointerdown', function (e) {
+    if (!isAdmin()) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    var cat = chip.getAttribute('data-cat');
+    if (cat === '全部' || cat === '__add') return;
+    drag = { chip: chip, name: cat, x0: e.clientX, y0: e.clientY, active: false, pid: e.pointerId };
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(function () {
+      if (!drag) return;
+      drag.active = true;
+      drag.chip.classList.add('lift');
+      el.chips.classList.add('dragging');
+      try { drag.chip.setPointerCapture(drag.pid); } catch (err) { }
+      if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) { } }
+    }, 420);
+  });
+
+  el.chips.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    if (!drag.active) {
+      if (Math.abs(e.clientX - drag.x0) > 6 || Math.abs(e.clientY - drag.y0) > 6) {
+        clearTimeout(holdTimer);
+        drag = null;
+      }
+      return;
+    }
+    e.preventDefault();
+    reorderChipTo(drag.chip, e.clientX);
+  });
+
+  el.chips.addEventListener('pointerup', endDrag);
+  el.chips.addEventListener('pointercancel', endDrag);
+  window.addEventListener('pointerup', endDrag);
+
+  function reorderChipTo(chip, x) {
+    var nodes = Array.prototype.slice.call(el.chips.querySelectorAll('.chip[data-cat]'));
+    for (var i = 0; i < nodes.length; i++) {
+      var c = nodes[i];
+      if (c === chip) continue;
+      if (c.getAttribute('data-cat') === '全部') continue;
+      var r = c.getBoundingClientRect();
+      if (x < r.left + r.width / 2) {
+        el.chips.insertBefore(chip, c);
+        return;
+      }
+    }
+    var addChip = el.chips.querySelector('.chip[data-cat="__add"]');
+    if (addChip) el.chips.insertBefore(chip, addChip);
+    else el.chips.appendChild(chip);
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    clearTimeout(holdTimer);
+    var wasActive = drag.active;
+    var chip = drag.chip;
+    drag = null;
+    el.chips.classList.remove('dragging');
+    if (chip) chip.classList.remove('lift');
+    if (!wasActive) return;
+    lastDragEnd = Date.now();
+    var order = Array.prototype.slice.call(el.chips.querySelectorAll('.chip[data-cat]'))
+      .map(function (c) { return c.getAttribute('data-cat'); })
+      .filter(function (n) { return n !== '全部' && n !== '__add'; });
+    saveCatOrder(order);
+    render();
+    if (pendingRender) { pendingRender = false; render(); }
+    queueSync();
+    toast('分类顺序已保存');
+  }
 
   /* 分类管理弹窗 */
   el.cAdd.addEventListener('click', function (e) { e.preventDefault(); createCat(); });
